@@ -32,10 +32,16 @@ def test_search_sorts_legal_cheap_first_and_filters_radius(monkeypatch):
         _m("d", "4 FAR ST", 35.0, -118.2400),
     ]
     monkeypatch.setattr(meters, "load_meters", lambda: data)
-    monkeypatch.setattr(meters, "occupancy", lambda: {"a": "VACANT"})
+    monkeypatch.setattr(meters, "occupancy", lambda: {
+        "a": {"state": "VACANT", "time": "2026-11-02T16:00:00Z"},
+        "b": {"state": "OCCUPIED", "time": "2026-11-02T17:00:00Z"},
+        "c": {"state": "UNKNOWN", "time": "2026-11-02T18:00:00Z"}})
     out = meters.search(34.05, -118.24, 1.0, MON_9AM, 90)
     assert [b["street"] for b in out] == ["1 CHEAP ST", "2 PRICEY ST", "3 SHORT ST"]
     assert out[0]["legal"] and out[0]["cost"] == 1.5 and out[0]["free_now"] == 1
+    assert out[0]["sensors"] == 1 and out[0]["last_reported"] == "2026-11-02T16:00:00Z"
+    assert out[1]["free_now"] == 0 and out[1]["last_reported"] == "2026-11-02T17:00:00Z"
+    assert out[2]["free_now"] is None and out[2]["sensors"] == 0  # UNKNOWN sensor is ignored
     assert not out[2]["legal"] and out[2]["reasons"]
 
 
@@ -46,3 +52,10 @@ def test_load_meters_drops_placeholder_coordinates(tmp_path, monkeypatch):
     cache.write_text(json.dumps(rows))
     monkeypatch.setattr(meters, "CACHE", cache)
     assert [m["spaceid"] for m in meters.load_meters()] == ["ok"]
+
+
+def test_multi_day_stay_breaks_a_time_limit(monkeypatch):
+    monkeypatch.setattr(meters, "load_meters", lambda: [_m("a", "1 LIMIT ST", 34.05, -118.24, "2HR", "$1.00")])
+    monkeypatch.setattr(meters, "occupancy", lambda: {})
+    out = meters.search(34.05, -118.24, 1.0, MON_9AM, 3 * 1440)
+    assert not out[0]["legal"] and out[0]["reasons"]

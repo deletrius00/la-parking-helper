@@ -36,10 +36,12 @@ def load_meters() -> list[dict]:
             (round(float(m["latlng"]["latitude"]), 5), round(float(m["latlng"]["longitude"]), 5)) not in bad]
 
 
-def occupancy() -> dict[str, str]:
+def occupancy() -> dict[str, dict]:
     if time.time() - _occ["t"] > 60:
         r = httpx.get(f"{BASE}/e7h6-4a3e.json", params={"$limit": 50000}, timeout=120)
-        _occ["d"] = {x["spaceid"]: x["occupancystate"] for x in r.json()} if r.status_code == 200 else {}
+        # eventtime is UTC (it matches local time + 7h in PDT); keep it as an ISO string with a Z suffix.
+        _occ["d"] = ({x["spaceid"]: {"state": x["occupancystate"], "time": x.get("eventtime", "")[:19] + "Z"}
+                      for x in r.json()} if r.status_code == 200 else {})
         _occ["t"] = time.time()
     return _occ["d"]
 
@@ -77,15 +79,16 @@ def search(lat: float, lon: float, radius_mi: float, when: datetime, minutes: in
         rule = Rule(METERED, limit_min=_limit_min(first.get("timelimit", "")),
                     price_per_hour=_rate(first.get("raterange", "")), **ASSUMED)
         v = evaluate([rule], when, minutes)
-        states = [occ.get(m["spaceid"]) for _, m in ms]
-        free = sum(s == "VACANT" for s in states)
+        reports = [occ[m["spaceid"]] for _, m in ms if occ.get(m["spaceid"], {}).get("state") in ("VACANT", "OCCUPIED")]
+        free = sum(r["state"] == "VACANT" for r in reports)
         out.append({
             "street": name, "miles": round(d, 2), "lat": float(first["latlng"]["latitude"]),
             "lon": float(first["latlng"]["longitude"]), "meters": len(ms),
             "limit_min": rule.limit_min, "rate": rule.price_per_hour, "legal": v.legal, "cost": v.cost,
             "move_by": v.move_by.isoformat() if v.move_by else None,
             "charging_starts": v.charging_starts.isoformat() if v.charging_starts else None,
-            "free_now": free if any(states) else None, "reasons": v.reasons,
+            "free_now": free if reports else None, "sensors": len(reports),
+            "last_reported": max(r["time"] for r in reports) if reports else None, "reasons": v.reasons,
         })
     # Blocks you can park on first, free before cheap before expensive, then nearest.
     return sorted(out, key=lambda b: (not b["legal"], b["cost"], b["miles"]))[:limit]

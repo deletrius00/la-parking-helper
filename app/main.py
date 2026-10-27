@@ -83,9 +83,9 @@ def geocode(q: str):
 def nearby(lat: float, lon: float, miles: float = 1.0, when: str = "", minutes: int = 60):
     t = datetime.fromisoformat(when) if when else datetime.now()
     blocks = meters.search(lat, lon, min(miles, 10.0), t, minutes)
-    flags = civic.sweep_flags([b["street"] for b in blocks])
+    wins = civic.sweep_windows([b["street"] for b in blocks])
     for b in blocks:
-        b["sweep"] = flags.get(b["street"], [])
+        b["sweep"] = civic.sweep_status(wins[b["street"]], t, minutes) if b["street"] in wins else None
     return blocks
 
 

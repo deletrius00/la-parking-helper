@@ -59,9 +59,27 @@ def test_ticket_grid_and_hours_parse(monkeypatch):
     assert len(hours) == 24 and hours[8] == 5 and sum(hours) == 5
 
 
-def test_sweep_flags_matches_street_name(monkeypatch):
+def test_route_day_and_clock_parsing():
+    assert civic._route_day("4P182 Tu") == 1 and civic._route_day("10P142 Th") == 3
+    assert civic._route_day("* 17P100") is None
+    assert civic._clock("10:00 AM") == 600 and civic._clock("1:00 PM") == 780 and civic._clock("12:00 AM") == 0
+
+
+def test_sweep_windows_match_street_name_and_day(monkeypatch):
     monkeypatch.setattr(civic, "_routes", [
-        {"time_start": "10:00 AM", "time_end": "1:00 PM", "boundaries": "Temple St to 3rd St"},
-        {"time_start": "8:00 AM", "time_end": "10:00 AM", "boundaries": "Adams Blvd to Jefferson Blvd"}])
-    flags = civic.sweep_flags(["101 TEMPLE ST", "5 OAK ST", "9 X ST"])
-    assert flags == {"101 TEMPLE ST": ["10:00 AM-1:00 PM"]}
+        {"route_no": "4P1 Tu", "time_start": "10:00 AM", "time_end": "1:00 PM", "boundaries": "Temple St to 3rd St"},
+        {"route_no": "9P9 M", "time_start": "8:00 AM", "time_end": "10:00 AM", "boundaries": "Adams Blvd to Jefferson Blvd"},
+        {"route_no": "* 17P100", "time_start": "8:00 AM", "time_end": "10:00 AM", "boundaries": "Temple St"}])
+    wins = civic.sweep_windows(["101 TEMPLE ST", "5 OAK ST", "9 X ST"])
+    assert wins == {"101 TEMPLE ST": [{"day": 1, "start": 600, "end": 780}]}  # no-weekday route skipped
+
+
+def test_sweep_status_move_by_vs_next():
+    from datetime import datetime
+    w = [{"day": 1, "start": 600, "end": 720}]  # Tuesday 10:00-12:00
+    mon9 = datetime(2026, 11, 2, 9, 0)
+    assert civic.sweep_status(w, mon9, 60) == {"move_by": None, "next": "2026-11-03T10:00:00"}
+    assert civic.sweep_status(w, mon9, 3 * 1440)["move_by"] == "2026-11-03T10:00:00"
+    during = datetime(2026, 11, 3, 11, 0)  # parked during the sweep window: move now
+    assert civic.sweep_status(w, during, 30)["move_by"] == "2026-11-03T11:00:00"
+    assert civic.sweep_status([], mon9, 60) is None

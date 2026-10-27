@@ -75,11 +75,25 @@ def ticket_hours(lat: float, lon: float, meters_radius: int = 800) -> list[int]:
 
 
 _routes: list[dict] = []
+_DAYS = {"M": 0, "TU": 1, "W": 2, "TH": 3, "F": 4}
 
 
-def sweep_flags(blockfaces: list[str]) -> dict[str, list[str]]:
-    """Blocks whose street name appears in a posted sweeping route, with the sweep time windows.
-    Name match only (the dataset has no geometry), so treat as 'may have sweeping'."""
+def _clock(text: str) -> int | None:
+    m = re.match(r"\s*(\d{1,2}):(\d{2})\s*([AP]M)", text.upper())
+    if not m:
+        return None
+    h = int(m.group(1)) % 12 + (12 if m.group(3) == "PM" else 0)
+    return h * 60 + int(m.group(2))
+
+
+def _route_day(route_no: str) -> int | None:
+    tail = route_no.strip("* ").split()[-1].upper() if " " in route_no.strip("* ") else ""
+    return _DAYS.get(tail)
+
+
+def sweep_windows(blockfaces: list[str]) -> dict[str, list[dict]]:
+    """Weekly sweeping windows {day 0-4, start, end (minutes)} for blocks whose street name appears
+    in a posted route. Name match only (the dataset has no geometry), so treat as 'may apply'."""
     if not _routes:
         r = httpx.get(f"{BASE}/krk7-ayq2.json", params={"$limit": 2000}, timeout=60)
         r.raise_for_status()
@@ -89,7 +103,32 @@ def sweep_flags(blockfaces: list[str]) -> dict[str, list[str]]:
         core = street_core(b)
         if len(core) < 4:
             continue
-        times = sorted({f"{x['time_start']}-{x['time_end']}" for x in _routes if core in x["boundaries"].upper()})
-        if times:
-            out[b] = times[:3]
+        wins = set()
+        for x in _routes:
+            day, a, z = _route_day(x["route_no"]), _clock(x["time_start"]), _clock(x["time_end"])
+            if core in x["boundaries"].upper() and None not in (day, a, z):
+                wins.add((day, a, z))
+        if wins:
+            out[b] = [{"day": d, "start": a, "end": z} for d, a, z in sorted(wins)][:6]
     return out
+
+
+def sweep_status(windows: list[dict], arrive, stay_minutes: int) -> dict | None:
+    """move_by: first sweep that overlaps the stay; next: first sweep that ends after arrival."""
+    stay_end = arrive + timedelta(minutes=stay_minutes)
+    day0 = arrive.replace(hour=0, minute=0, second=0, microsecond=0)
+    move_by = nxt = None
+    for offset in range(0, 15):
+        d = day0 + timedelta(days=offset)
+        for w in sorted((w for w in windows if w["day"] == d.weekday()), key=lambda w: w["start"]):
+            start, end = d + timedelta(minutes=w["start"]), d + timedelta(minutes=w["end"])
+            if end <= arrive:
+                continue
+            nxt = nxt or start
+            if start < stay_end and not move_by:
+                move_by = max(start, arrive)
+        if move_by and nxt:
+            break
+    if not nxt:
+        return None
+    return {"move_by": move_by.isoformat() if move_by else None, "next": nxt.isoformat()}

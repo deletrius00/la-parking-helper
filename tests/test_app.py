@@ -39,3 +39,13 @@ def test_ai_endpoints_disabled_without_key(monkeypatch):
 def test_config_reports_ai_enabled(monkeypatch):
     monkeypatch.setattr(main.config, "API_KEY", "k")
     assert client.get("/api/config").json() == {"ai": True}
+
+
+def test_nearby_attaches_live_and_sweep_fields(monkeypatch):
+    block = {"street": "101 TEMPLE ST", "legal": True, "cost": 1.0, "free_now": 2, "sensors": 3,
+             "last_reported": "2026-11-02T16:00:00Z"}
+    monkeypatch.setattr(main.meters, "search", lambda *a: [dict(block)])
+    monkeypatch.setattr(main.civic, "sweep_windows", lambda names: {"101 TEMPLE ST": [{"day": 1, "start": 600, "end": 720}]})
+    out = client.get("/api/nearby", params={"lat": 34, "lon": -118, "when": "2026-11-02T09:00", "minutes": 4320}).json()[0]
+    assert out["free_now"] == 2 and out["last_reported"].endswith("Z")
+    assert out["sweep"]["move_by"] == "2026-11-03T10:00:00"
