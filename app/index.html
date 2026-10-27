@@ -73,7 +73,7 @@ details summary{cursor:pointer;font-weight:600}
  </div>
  <div id="results"><div class="empty">Search an address or drop a pin to see where you can park, cheapest first.</div></div>
  <div id="civic"></div>
- <details class="panel"><summary>Read a parking sign photo</summary>
+ <details class="panel" id="signPanel"><summary>Read a parking sign photo</summary>
   <div class="row"><input type="file" id="f" accept="image/*"><button class="btn ghost" onclick="up()">Read sign</button></div>
   <div id="signs" class="sub">No sign read yet.</div>
   <div class="row"><button class="btn ghost" onclick="check()">Can I park by this sign?</button></div>
@@ -93,6 +93,7 @@ const lg=L.control({position:'bottomright'});lg.onAdd=()=>{const d=L.DomUtil.cre
  d.innerHTML='🎫 Tickets<div class="g"></div><div style="display:flex;justify-content:space-between"><span>fewer</span><span>more</span></div>🧹 sweeping may apply';return d};lg.addTo(map);
 $('when').value=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,16);
 
+fetch('/api/config').then(r=>r.json()).then(c=>{if(!c.ai){$('mic').style.display='none';$('signPanel').style.display='none'}});
 /* chips */
 function chips(el,vals,fmt,cur,cb){$(el).innerHTML='';vals.forEach(v=>{const b=document.createElement('button');b.className='chip'+(v==cur?' on':'');
  b.textContent=fmt(v);b.onclick=()=>{[...$(el).children].forEach(c=>c.classList.remove('on'));b.classList.add('on');cb(v)};$(el).append(b)})}

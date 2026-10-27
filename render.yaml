@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: la-parking-helper
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      # MODEL_API_KEY is intentionally not set: AI features stay off on the public site.

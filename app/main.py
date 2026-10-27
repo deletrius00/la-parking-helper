@@ -3,7 +3,7 @@ from pathlib import Path
 from dataclasses import asdict
 from datetime import datetime
 
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, Response
 from PIL import Image
 from pydantic import BaseModel
@@ -11,11 +11,31 @@ from pydantic import BaseModel
 from parking.mapillary import sign_crops
 from parking.rules import Rule, evaluate
 from parking import civic, meters
+from src import config
 from parking.overlay import overlay
 from parking.signs import read_image, read_sign, to_rules
 from parking.voice import parse_trip, transcribe
 
 app = FastAPI()
+
+
+def _need_ai() -> None:
+    """Public deployments run without a Meta key, so the model-backed endpoints are switched off."""
+    if not config.API_KEY:
+        raise HTTPException(503, "AI features are disabled on this deployment (no MODEL_API_KEY).")
+
+
+@app.get("/api/config")
+def cfg():
+    return {"ai": bool(config.API_KEY)}
+
+
+@app.on_event("startup")
+def warm():
+    try:
+        meters.load_meters()
+    except Exception:
+        pass
 
 
 def _dump(rules: list[Rule]) -> list[dict]:
@@ -24,23 +44,27 @@ def _dump(rules: list[Rule]) -> list[dict]:
 
 @app.post("/api/read")
 async def read(file: UploadFile = File(...)):
+    _need_ai()
     r = read_image(Image.open(io.BytesIO(await file.read())))
     return {**r, "rules": _dump(r["rules"])}
 
 
 @app.post("/api/voice")
 async def voice(file: UploadFile = File(...)):
+    _need_ai()
     text = transcribe(await file.read())
     return {"heard": text, **parse_trip(text)}
 
 
 @app.post("/api/overlay")
 async def overlay_ep(status: str, caption: str, file: UploadFile = File(...)):
+    _need_ai()
     return Response(overlay(await file.read(), status, caption), media_type="image/jpeg")
 
 
 @app.get("/api/mapillary")
 def mapillary(lat: float, lon: float, count: int = 4):
+    _need_ai()
     out = []
     for p in sign_crops(lat, lon, count=count):
         sign = read_sign(Image.open(p))

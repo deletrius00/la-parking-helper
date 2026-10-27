@@ -27,3 +27,15 @@ def test_nearby_caps_radius_at_ten_miles(monkeypatch):
     monkeypatch.setattr(main.meters, "search", lambda lat, lon, mi, t, m: seen.setdefault("mi", mi) and [])
     client.get("/api/nearby", params={"lat": 34, "lon": -118, "miles": 50})
     assert seen["mi"] == 10.0
+
+
+def test_ai_endpoints_disabled_without_key(monkeypatch):
+    monkeypatch.setattr(main.config, "API_KEY", "")
+    assert client.get("/api/config").json() == {"ai": False}
+    r = client.post("/api/read", files={"file": ("a.jpg", b"x", "image/jpeg")})
+    assert r.status_code == 503
+
+
+def test_config_reports_ai_enabled(monkeypatch):
+    monkeypatch.setattr(main.config, "API_KEY", "k")
+    assert client.get("/api/config").json() == {"ai": True}

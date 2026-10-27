@@ -22,6 +22,12 @@ The yes/no decision is made by plain code (`parking/rules.py`), not by a model.
   Metered blocks only; meter hours are assumed 8am-6pm Mon-Sat. Posted signs always control.
 - Sample photos in `photos/` come from Wikimedia Commons, see `photos/SOURCES.md` for licences.
 
+## Live demo
+Hosting link: _coming soon_. The public site runs the meter search, map, ticket risk and sweeping layers.
+The Meta-model features (sign photo, voice, overlay) are off there to protect the API credit; run locally with a key to use them.
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/deletrius00/la-parking-helper)
+
 ## Run
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt

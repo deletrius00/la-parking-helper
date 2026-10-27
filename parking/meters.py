@@ -20,6 +20,7 @@ _occ = {"t": 0.0, "d": {}}
 
 def load_meters() -> list[dict]:
     if not CACHE.exists():
+        CACHE.parent.mkdir(exist_ok=True)
         r = httpx.get(f"{BASE}/s49e-q6j2.json", params={"$limit": 50000}, timeout=120)
         r.raise_for_status()
         CACHE.write_text(json.dumps(r.json()))
