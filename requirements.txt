@@ -1,0 +1,9 @@
+httpx
+python-dotenv
+pillow
+pytest
+openai
+mapbox-vector-tile
+fastapi
+uvicorn
+python-multipart

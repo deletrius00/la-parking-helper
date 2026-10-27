@@ -1,0 +1,11 @@
+.venv/
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+data/
+photos/mapillary/
+photos/mapillary_crops/
+photos/_synthetic.jpg
+.claude/
