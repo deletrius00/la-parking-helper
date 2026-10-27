@@ -86,7 +86,8 @@ def search(lat: float, lon: float, radius_mi: float, when: datetime, minutes: in
             "charging_starts": v.charging_starts.isoformat() if v.charging_starts else None,
             "free_now": free if any(states) else None, "reasons": v.reasons,
         })
-    return sorted(out, key=lambda b: b["miles"])[:limit]
+    # Blocks you can park on first, free before cheap before expensive, then nearest.
+    return sorted(out, key=lambda b: (not b["legal"], b["cost"], b["miles"]))[:limit]
 
 
 def geocode(q: str) -> tuple[float, float] | None:

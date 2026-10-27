@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LA Parking Helper</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#14181f;--mute:#5b6472;--line:#e3e6eb;--accent:#2557d6;
+--free:#0b7a3b;--free-bg:#e3f5ea;--cheap:#1456a8;--cheap-bg:#e4eefb;--pricey:#9a5b00;--pricey-bg:#fdf0d9;--bad:#b3261e;--bad-bg:#fbe7e5}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1117;--panel:#171b23;--ink:#eef1f6;--mute:#9aa3b2;--line:#2a303b;--accent:#6e96ff;
+--free:#4cd38a;--free-bg:#12301f;--cheap:#7db3ff;--cheap-bg:#14263f;--pricey:#f3b24a;--pricey-bg:#3a2a0d;--bad:#ff8f86;--bad-bg:#3d1714}}
+*{box-sizing:border-box}body{margin:0;font:15px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--ink)}
+header{padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header h1{font-size:18px;margin:0 8px 0 0}
+.search{display:flex;flex:1;min-width:260px;gap:8px}
+input,select,button{font:inherit;color:inherit}
+input[type=text],input[type=number],input[type=datetime-local]{padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.search input{flex:1}
+.btn{padding:9px 14px;border:0;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+main{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(340px,1fr);height:calc(100vh - 62px)}
+#map{height:100%;min-height:360px}
+aside{overflow:auto;padding:14px;background:var(--bg)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.panel h3{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute)}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}
+.row label{color:var(--mute);min-width:70px}
+.chip{padding:6px 11px;border:1px solid var(--line);border-radius:99px;background:transparent;cursor:pointer}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.summary{font-size:17px;font-weight:650;margin:2px 0 4px}.sub{color:var(--mute);font-size:13px}
+.tabs{display:flex;gap:6px;margin:10px 0}
+.card{display:flex;gap:12px;padding:11px 12px;margin-bottom:8px;border:1px solid var(--line);border-radius:12px;background:var(--panel);cursor:pointer}
+.card:hover,.card.sel{border-color:var(--accent)}
+.price{min-width:68px;height:48px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px}
+.t-free{background:var(--free-bg);color:var(--free)}.t-cheap{background:var(--cheap-bg);color:var(--cheap)}
+.t-pricey{background:var(--pricey-bg);color:var(--pricey)}.t-bad{background:var(--bad-bg);color:var(--bad)}
+.card h4{margin:0 0 2px;font-size:15px}.card p{margin:0;color:var(--mute);font-size:13px}.card .warn{color:var(--bad)}
+.pin{font:700 12px system-ui;padding:3px 7px;border-radius:99px;border:2px solid #fff;box-shadow:0 1px 4px #0006;white-space:nowrap;color:#fff;transform:translate(-50%,-50%);display:inline-block}
+.m-free{background:#0b7a3b}.m-cheap{background:#1456a8}.m-pricey{background:#b36b00}.m-bad{background:#b3261e}
+.bar{height:8px;border-radius:4px;background:var(--accent);margin:2px 0 8px}
+.tk{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:13px}
+details summary{cursor:pointer;font-weight:600}
+.empty{color:var(--mute);padding:24px 8px;text-align:center}
+@media(max-width:820px){main{grid-template-columns:1fr;height:auto}#map{height:320px}aside{overflow:visible}}
+</style></head><body>
+<header>
+ <h1>🅿️ LA Parking Helper</h1>
+ <div class="search"><input type="text" id="addr" placeholder="Street address, e.g. 200 N Spring St, Los Angeles">
+ <button class="btn" onclick="geo()">Search</button></div>
+ <span class="sub">or click the map to drop a pin</span>
+</header>
+<main>
+<div id="map"></div>
+<aside>
+ <div class="panel"><h3>Your trip</h3>
+  <div class="row"><label>Radius</label><span id="radChips"></span></div>
+  <div class="row"><label>Stay</label><span id="stayChips"></span>
+   <input type="number" id="mins" value="60" min="5" style="width:80px"> min</div>
+  <div class="row"><label>Arrive</label><input type="datetime-local" id="when">
+   <button class="chip" id="mic" onclick="rec()">🎤 Say it</button></div>
+  <div class="sub" id="heard"></div>
+  <div class="row"><button class="btn" onclick="near()">Find parking</button></div>
+ </div>
+ <div id="results"><div class="empty">Search an address or drop a pin to see where you can park, cheapest first.</div></div>
+ <div id="civic"></div>
+ <details class="panel"><summary>Read a parking sign photo</summary>
+  <div class="row"><input type="file" id="f" accept="image/*"><button class="btn ghost" onclick="up()">Read sign</button></div>
+  <div id="signs" class="sub">No sign read yet.</div>
+  <div class="row"><button class="btn ghost" onclick="check()">Can I park by this sign?</button></div>
+  <div id="out"></div><div id="ov"></div>
+ </details>
+ <p class="sub">Meter data only: LADOT inventory and live occupancy. Hours are assumed 8am-6pm Mon-Sat. Posted signs always control.</p>
+</aside>
+</main>
+<script>
+const $=i=>document.getElementById(i);
+let pin=null,layer=null,items=[],filter='ok',markers=[];
+const map=L.map('map').setView([34.0522,-118.2437],12);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap'}).addTo(map);
+$('when').value=new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,16);
+
+/* chips */
+function chips(el,vals,fmt,cur,cb){$(el).innerHTML='';vals.forEach(v=>{const b=document.createElement('button');b.className='chip'+(v==cur?' on':'');
+ b.textContent=fmt(v);b.onclick=()=>{[...$(el).children].forEach(c=>c.classList.remove('on'));b.classList.add('on');cb(v)};$(el).append(b)})}
+let radius=0.5;
+chips('radChips',[0.25,0.5,1,2,5,10],v=>v+' mi',radius,v=>{radius=v});
+chips('stayChips',[30,60,120,180,240],v=>v<60?v+' min':v/60+' hr',60,v=>{$('mins').value=v});
+$('mins').oninput=()=>[...$('stayChips').children].forEach(c=>c.classList.remove('on'));
+
+/* helpers */
+const title=s=>s.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()).replace(/\bBlvd\b/,'Blvd');
+const t12=iso=>new Date(iso).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+const day=iso=>new Date(iso).toLocaleDateString([],{weekday:'short'})+' '+t12(iso);
+const money=c=>c===0?'Free':'$'+c.toFixed(2);
+const tier=b=>!b.legal?'bad':b.cost===0?'free':b.cost<=3?'cheap':'pricey';
+const lim=m=>m?(m>=60?m/60+' hr':m+' min')+' limit':'no limit';
+function setPin(a,b){pin?pin.setLatLng([a,b]):pin=L.marker([a,b]).addTo(map);map.setView([a,b],radius>=2?12:radius>=1?13:15)}
+map.on('click',e=>setPin(e.latlng.lat,e.latlng.lng));
+async function geo(){const r=await (await fetch('/api/geocode?q='+encodeURIComponent($('addr').value))).json();
+ if(r.error){$('results').innerHTML='<div class="empty">Address not found. Use a street address, not an intersection.</div>';return}
+ setPin(r.lat,r.lon);near()}
+
+/* search */
+async function near(){
+ if(!pin){$('results').innerHTML='<div class="empty">Enter an address or click the map first.</div>';return}
+ $('results').innerHTML='<div class="empty">Searching meters…</div>';const p=pin.getLatLng();
+ const r=await (await fetch(`/api/nearby?lat=${p.lat}&lon=${p.lng}&miles=${radius}&when=${$('when').value}&minutes=${$('mins').value}`)).json();
+ items=r;filter='ok';render();civicInfo(p);
+}
+function render(){
+ markers.forEach(m=>m.remove());markers=[];
+ const ok=items.filter(b=>b.legal),free=ok.filter(b=>b.cost===0);
+ const cheapest=ok.length?Math.min(...ok.map(b=>b.cost)):null;
+ const shown=items.filter(b=>filter==='ok'?b.legal:filter==='free'?b.legal&&b.cost===0:!b.legal);
+ shown.forEach(b=>{const t=tier(b);const m=L.marker([b.lat,b.lon],{icon:L.divIcon({className:'',html:`<span class="pin m-${t}">${b.legal?money(b.cost):'✕'}</span>`,iconSize:[0,0]})}).addTo(map);
+  m.on('click',()=>sel(b.street));m._street=b.street;markers.push(m)});
+ const tab=(k,l,n)=>`<button class="chip ${filter===k?'on':''}" onclick="filter='${k}';render()">${l} (${n})</button>`;
+ $('results').innerHTML=`<div class="panel"><div class="summary">${ok.length} of ${items.length} blocks work for ${$('mins').value} min</div>
+  <div class="sub">${cheapest===null?'None match: try a shorter stay or another time.':'Cheapest '+money(cheapest)+' · '+free.length+' free'}</div>
+  <div class="tabs">${tab('ok','Can park',ok.length)}${tab('free','Free',free.length)}${tab('bad','Cannot',items.length-ok.length)}</div></div>`+
+  (shown.map(b=>{const t=tier(b);const notes=[];
+   if(b.legal&&b.move_by)notes.push('Move by '+t12(b.move_by));
+   if(b.legal&&b.charging_starts)notes.push('Free until '+day(b.charging_starts));
+   if(b.free_now!=null)notes.push(b.free_now+' free spot'+(b.free_now==1?'':'s')+' now');
+   return `<article class="card" data-s="${b.street}" onclick="sel('${b.street.replace(/'/g,"\\'")}',true)"><div class="price t-${t}">${b.legal?money(b.cost):'✕'}</div>
+   <div><h4>${title(b.street)}</h4><p>${b.miles} mi · ${b.meters} meters · ${lim(b.limit_min)} · $${b.rate}/h</p>
+   ${b.legal?(notes.length?`<p>${notes.join(' · ')}</p>`:''):`<p class="warn">${b.reasons[0]||'Not allowed'}</p>`}</div></article>`}).join('')||'<div class="empty">Nothing in this view.</div>');
+ if(shown.length){const g=L.featureGroup(markers.concat(pin));map.fitBounds(g.getBounds().pad(.15))}
+}
+function sel(street,fly){document.querySelectorAll('.card').forEach(c=>c.classList.toggle('sel',c.dataset.s===street));
+ const m=markers.find(x=>x._street===street);if(!m)return;if(fly)map.flyTo(m.getLatLng(),17);
+ L.popup().setLatLng(m.getLatLng()).setContent('<b>'+title(street)+'</b>').openOn(map);
+ if(!fly){const c=document.querySelector(`.card[data-s="${street}"]`);c&&c.scrollIntoView({block:'nearest',behavior:'smooth'})}}
+
+/* ticket risk + sweeping */
+async function civicInfo(p){const el=$('civic');el.innerHTML='<div class="panel sub">Loading ticket and sweeping data…</div>';
+ const m=Math.min(800,Math.round(radius*1609));
+ const [k,sw]=await Promise.all([fetch(`/api/risk?lat=${p.lat}&lon=${p.lng}&radius_m=${m}`).then(x=>x.json()),
+  fetch('/api/sweeping?streets='+encodeURIComponent(items.slice(0,3).map(b=>b.street).join('|'))).then(x=>x.json())]);
+ const mx=Math.max(1,...k.top.map(t=>t.tickets));
+ el.innerHTML=`<div class="panel"><h3>Ticket risk · ${k.radius_m} m · last 12 months</h3><div class="summary">${k.total.toLocaleString()} tickets</div>
+  <div class="tk">${k.top.map(t=>`<span>${t.violation}</span><span><b>${t.tickets.toLocaleString()}</b> · $${t.avg_fine}</span>
+  <div class="bar" style="width:${t.tickets/mx*100}%;grid-column:1/3"></div>`).join('')}</div></div>
+  <div class="panel"><h3>Street sweeping that may apply</h3>${sw.length?sw.slice(0,6).map(x=>`<div class="tk"><span>${x.boundaries}</span><span>${x.start}–${x.end}</span></div>`).join('<hr style="border:0;border-top:1px solid var(--line)">'):'<div class="sub">None matched.</div>'}
+  <div class="sub" style="margin-top:6px">Matched by street name only. Check the posted sign for the day.</div></div>`}
+
+/* sign photo flow */
+let rules=[];
+function showSigns(r){rules=r.rules;$('signs').innerHTML=(r.text?`<p><b>${r.legible?'':'(unclear) '}</b>${r.text}</p>`:'<p>Nothing readable.</p>')+
+ r.rules.map(x=>`<div>→ ${x.kind.replace('_',' ')} ${fmtM(x.start_min)}–${fmtM(x.end_min)}${x.limit_min?' · '+x.limit_min+' min':''}${x.price_per_hour?' · $'+x.price_per_hour+'/h':''}</div>`).join('')+
+ (r.sam_boxes!=null?`<div class="sub">SAM 3.1 found ${r.sam_boxes} sign(s)</div>`:'')}
+const fmtM=m=>String(m/60|0).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+async function up(){const f=$('f').files[0];if(!f)return;$('signs').textContent='Reading…';const fd=new FormData();fd.append('file',f);
+ showSigns(await (await fetch('/api/read',{method:'POST',body:fd})).json())}
+async function check(){if(!rules.length){$('out').textContent='Read a sign first.';return}
+ const r=await (await fetch('/api/evaluate',{method:'POST',headers:{'Content-Type':'application/json'},
+ body:JSON.stringify({rules,when:$('when').value,minutes:+$('mins').value})})).json();
+ $('out').innerHTML=`<div class="card"><div class="price t-${r.legal?(r.cost?'cheap':'free'):'bad'}">${r.legal?money(r.cost):'✕'}</div><div><h4>${r.legal?'You can park':'Do not park'}</h4>
+ <p>${[r.move_by&&'Move by '+t12(r.move_by),r.charging_starts&&'Free until '+day(r.charging_starts),...r.reasons].filter(Boolean).join(' · ')}</p></div></div>`;
+ const f=$('f').files[0];if(f){$('ov').textContent='Drawing overlay (Muse Image)…';
+  const q=new URLSearchParams({status:r.legal?(r.move_by?'warn':'ok'):'bad',caption:r.legal?`OK - ${money(r.cost)}`+(r.move_by?` - move by ${t12(r.move_by)}`:''):'DO NOT PARK'});
+  const fd=new FormData();fd.append('file',f);const o=await fetch('/api/overlay?'+q,{method:'POST',body:fd});
+  $('ov').innerHTML=o.ok?`<img style="max-width:100%;border-radius:10px" src="${URL.createObjectURL(await o.blob())}">`:'<div class="sub">Overlay failed.</div>'}}
+
+/* voice: record, convert to 16 kHz WAV (the API accepts WAV only) */
+async function rec(){const b=$('mic');if(window.mr&&mr.state=='recording'){mr.stop();return}
+ const st=await navigator.mediaDevices.getUserMedia({audio:true});window.mr=new MediaRecorder(st);const ch=[];mr.ondataavailable=e=>ch.push(e.data);
+ mr.onstop=async()=>{st.getTracks().forEach(t=>t.stop());b.textContent='Working…';
+  const ac=new AudioContext({sampleRate:16000});const buf=await ac.decodeAudioData(await new Blob(ch).arrayBuffer());
+  const d=buf.getChannelData(0),w=new DataView(new ArrayBuffer(44+d.length*2)),S=(o,t)=>[...t].forEach((c,i)=>w.setUint8(o+i,c.charCodeAt(0)));
+  S(0,'RIFF');w.setUint32(4,36+d.length*2,true);S(8,'WAVEfmt ');w.setUint32(16,16,true);w.setUint16(20,1,true);w.setUint16(22,1,true);
+  w.setUint32(24,16000,true);w.setUint32(28,32000,true);w.setUint16(32,2,true);w.setUint16(34,16,true);S(36,'data');w.setUint32(40,d.length*2,true);
+  d.forEach((x,i)=>w.setInt16(44+i*2,Math.max(-1,Math.min(1,x))*32767,true));
+  const fd=new FormData();fd.append('file',new Blob([w],{type:'audio/wav'}),'c.wav');
+  const r=await (await fetch('/api/voice',{method:'POST',body:fd})).json();$('heard').textContent='Heard: “'+r.heard+'”';
+  $('when').value=r.when.slice(0,16);$('mins').value=r.minutes;[...$('stayChips').children].forEach(c=>c.classList.remove('on'));b.textContent='🎤 Say it'};
+ mr.start();b.textContent='⏹ Stop';}
+</script></body></html>

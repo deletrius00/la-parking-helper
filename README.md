@@ -11,6 +11,12 @@ you'll park, and see whether you can park there, what it costs and when you must
 
 The yes/no decision is made by plain code (`parking/rules.py`), not by a model.
 
+## Features
+- Address search or map pin, radius up to 10 miles, stay length and arrival time (or say it by voice).
+- Blocks ranked free, then cheapest, with the total cost for your stay, move-by time and live free spots.
+- Ticket risk from LA parking citations (12 months, aggregated) and posted street-sweeping routes.
+- Read a sign photo (SAM 3.1 + Spark), check it against your trip, get a Muse Image verdict overlay.
+
 ## Data
 - [LADOT metered parking inventory](https://data.lacity.org) (blocks, rates, limits) and live meter occupancy.
   Metered blocks only; meter hours are assumed 8am-6pm Mon-Sat. Posted signs always control.
