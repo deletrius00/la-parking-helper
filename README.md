@@ -23,7 +23,7 @@ The yes/no decision is made by plain code (`parking/rules.py`), not by a model.
 - Sample photos in `photos/` come from Wikimedia Commons, see `photos/SOURCES.md` for licences.
 
 ## Live demo
-Hosting link: _coming soon_. The public site runs the meter search, map, ticket risk and sweeping layers.
+**Live: https://la-parking-helper.onrender.com/** (free plan, first visit may take ~30 s to wake). The public site runs the meter search, map, ticket risk and sweeping layers.
 The Meta-model features (sign photo, voice, overlay) are off there to protect the API credit; run locally with a key to use them.
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/deletrius00/la-parking-helper)
