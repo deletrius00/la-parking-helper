@@ -58,12 +58,22 @@ def geocode(q: str):
 @app.get("/api/nearby")
 def nearby(lat: float, lon: float, miles: float = 1.0, when: str = "", minutes: int = 60):
     t = datetime.fromisoformat(when) if when else datetime.now()
-    return meters.search(lat, lon, min(miles, 10.0), t, minutes)
+    blocks = meters.search(lat, lon, min(miles, 10.0), t, minutes)
+    flags = civic.sweep_flags([b["street"] for b in blocks])
+    for b in blocks:
+        b["sweep"] = flags.get(b["street"], [])
+    return blocks
 
 
 @app.get("/api/risk")
 def risk(lat: float, lon: float, radius_m: int = 400):
     return civic.citation_risk(lat, lon, min(radius_m, 2000))
+
+
+@app.get("/api/heat")
+def heat(lat: float, lon: float, radius_m: int = 800):
+    r = min(radius_m, 1600)
+    return {"cells": civic.ticket_grid(lat, lon, r), "hours": civic.ticket_hours(lat, lon, r)}
 
 
 @app.get("/api/sweeping")

@@ -42,3 +42,26 @@ def test_sweeping_dedupes_and_builds_query(monkeypatch):
 def test_sweeping_with_no_streets_makes_no_request(monkeypatch):
     monkeypatch.setattr(civic.httpx, "get", lambda *a, **k: (_ for _ in ()).throw(AssertionError))
     assert civic.sweeping_for([]) == []
+
+
+def test_ticket_grid_and_hours_parse(monkeypatch):
+    calls = []
+
+    def fake(url, params=None, **k):
+        calls.append(params["$select"])
+        if "round" in params["$select"]:
+            return _Resp([{"la": "34.047", "lo": "-118.252", "n": "7"}, {"n": "1"}])
+        return _Resp([{"h": "8", "n": "5"}, {"h": "25", "n": "9"}])
+
+    monkeypatch.setattr(civic.httpx, "get", fake)
+    assert civic.ticket_grid(34.05, -118.24) == [{"lat": 34.047, "lon": -118.252, "n": 7}]
+    hours = civic.ticket_hours(34.05, -118.24)
+    assert len(hours) == 24 and hours[8] == 5 and sum(hours) == 5
+
+
+def test_sweep_flags_matches_street_name(monkeypatch):
+    monkeypatch.setattr(civic, "_routes", [
+        {"time_start": "10:00 AM", "time_end": "1:00 PM", "boundaries": "Temple St to 3rd St"},
+        {"time_start": "8:00 AM", "time_end": "10:00 AM", "boundaries": "Adams Blvd to Jefferson Blvd"}])
+    flags = civic.sweep_flags(["101 TEMPLE ST", "5 OAK ST", "9 X ST"])
+    assert flags == {"101 TEMPLE ST": ["10:00 AM-1:00 PM"]}
